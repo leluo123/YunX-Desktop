@@ -1,9 +1,9 @@
 name: 同步上游并构建 Windows 便携版
 
 # 这个仓库只做「跟随上游 + 编译打包」，不改任何功能代码。
-#   1) sync  : 拉上游 tidain/YunX-Desktop 的 main，合并进本仓库 main 并 push
-#   2) build : 在 windows-2022 上跑上游自带的 portable-package.ps1，产出 YunX-Desktop-portable-v<版本>.zip
-#   3) release: 把 zip 挂到这个仓库的 Releases，tag 沿用上游版本号 v<版本>
+#   1) sync   : 拉上游 tidain/YunX-Desktop 的 main，合并进本仓库 main 并 push
+#   2) build  : 在 windows-2022 上跑上游自带的 portable-package.ps1，产出 YunX-Desktop.exe
+#   3) release: 打成 YunX-Desktop-portable-v<版本>.zip 并挂到本仓库 Releases（tag 沿用上游版本号）
 #
 # 触发方式：每天定时 / 手动 Run workflow（可勾 force 强制重构建同版本）
 
@@ -74,9 +74,8 @@ jobs:
             echo "synced=true" >> "$GITHUB_OUTPUT"
           fi
 
-          # 上游 README 原文备份（AGPL 要求保留原作者版权声明与文档）
+          # 上游 README 原文备份（保留原作者文档与版权声明）
           git show FETCH_HEAD:README.md > README.upstream.md
-
           if ! git diff --quiet HEAD -- README.upstream.md; then
             git add README.upstream.md
             git commit -m "docs: 同步上游 README 原文备份"
@@ -113,9 +112,9 @@ jobs:
             NEED="true"
           fi
 
-          echo "version=$VER"       >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG"           >> "$GITHUB_OUTPUT"
-          echo "need_build=$NEED"   >> "$GITHUB_OUTPUT"
+          echo "version=$VER"     >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "need_build=$NEED" >> "$GITHUB_OUTPUT"
 
   build:
     name: 构建并发布 Windows 便携版
@@ -147,34 +146,61 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # 与上游 pr-portable.yml 完全相同的打包入口：Kotlin 编译 + darkmode.dll(MSVC)
-      # + jar 裁剪 + JCEF 语言包裁剪 + jlink 运行时 + jpackage + 自研启动器
+      # 与上游 pr-portable.yml 相同的打包入口：Kotlin 编译 + darkmode.dll(MSVC) + jar 裁剪
+      # + JCEF 语言包裁剪 + jlink 运行时 + jpackage + 自研启动器
       - name: 构建便携包
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           .\portable-package.ps1
-          if (-not (Test-Path '.\release\YunX-Desktop\YunX-Desktop.exe')) {
-            throw '构建结束但没有找到 release\YunX-Desktop\YunX-Desktop.exe'
-          }
-          Write-Host ('exe size = ' + [math]::Round((Get-Item '.\release\YunX-Desktop\YunX-Desktop.exe').Length/1KB,0) + ' KB')
+          $exe = '.\release\YunX-Desktop\YunX-Desktop.exe'
+          if (-not (Test-Path $exe)) { throw "构建结束但没有找到 $exe" }
+          $kb = [math]::Round((Get-Item $exe).Length / 1KB, 0)
+          $mb = [math]::Round(((Get-ChildItem '.\release\YunX-Desktop' -Recurse -File | Measure-Object Length -Sum).Sum) / 1MB, 1)
+          Write-Host "便携目录就绪：$mb MB，启动器 $kb KB"
 
+      # 用 Windows 自带的 bsdtar 打 zip（tar.exe 是系统组件，7z 在 runner 上不一定在 PATH，
+      # 上游 pr-portable.yml 的 3 次失败都卡在 7z 这一步）；再兜底 Compress-Archive
       - name: 打包为 zip
         id: zip
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $v = '${{ needs.sync.outputs.version }}'
+          $v    = '${{ needs.sync.outputs.version }}'
           $name = "YunX-Desktop-portable-v$v"
-          Push-Location .\release
+          $src  = '.\release\YunX-Desktop'
+          if (-not (Test-Path (Join-Path $src 'YunX-Desktop.exe'))) { throw "没有找到 $src\YunX-Desktop.exe" }
+          if (Test-Path "$name.zip") { Remove-Item "$name.zip" -Force }
+
+          $done = $false
+          if (Get-Command tar.exe -ErrorAction SilentlyContinue) {
+            Push-Location '.\release'
+            try {
+              & tar.exe -a -c -f "..\$name.zip" 'YunX-Desktop'
+              if ($LASTEXITCODE -eq 0 -and (Test-Path "..\$name.zip")) { $done = $true }
+              else { Write-Host "tar 返回 $LASTEXITCODE" }
+            } finally { Pop-Location }
+          }
+          if (-not $done) {
+            Write-Host '::warning::tar 不可用或失败，回退 Compress-Archive'
+            Compress-Archive -Path $src -DestinationPath "$name.zip" -CompressionLevel Optimal -Force
+            $done = Test-Path "$name.zip"
+          }
+          if (-not $done) { throw '打包 zip 失败：tar 与 Compress-Archive 都不可用' }
+
+          # 产物自检：能打开、有条目、根下有 exe
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $z = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path "$name.zip").Path)
           try {
-            & 7z a -tzip -mx=5 "..\$name.zip" "YunX-Desktop" | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "7z 打包失败，exit=$LASTEXITCODE" }
-          } finally { Pop-Location }
+            $entries = $z.Entries.Count
+            $hasExe  = @($z.Entries | Where-Object { $_.FullName -eq 'YunX-Desktop/YunX-Desktop.exe' }).Count -gt 0
+          } finally { $z.Dispose() }
+          if (-not $hasExe) { throw "zip 内没有 YunX-Desktop/YunX-Desktop.exe（条目数 $entries）" }
+
           $mb = [math]::Round((Get-Item "$name.zip").Length / 1MB, 1)
-          Write-Host "产物：$name.zip（$mb MB）"
+          Write-Host "产物：$name.zip（$mb MB，$entries 个条目，已确认含 exe）"
           "name=$name" >> $env:GITHUB_OUTPUT
-          [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, "### 便携包：$name.zip（$mb MB）`n")
+          [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, "### 便携包：$name.zip（$mb MB，$entries 个条目）`n")
 
       # 安装版是加分项：需要 Inno Setup（脚本会自动下载安装），失败不影响便携包发布
       - name: 尝试构建安装版（失败不阻塞）
@@ -205,12 +231,12 @@ jobs:
           body: |
             ## 云析 YunX ${{ needs.sync.outputs.version }} · Windows 便携版
 
-            本产物由 **本仓库自动构建**（同步上游代码 → 跑上游自带的 `portable-package.ps1` → 打包）。
+            本产物由 **本仓库自动构建**：同步上游代码 → 跑上游自带的 `portable-package.ps1` → 打包 zip。
             代码版权归原作者所有，详见 [README](https://github.com/${{ github.repository }}/blob/main/README.md)。
 
             ### 下载
             - `YunX-Desktop-portable-v${{ needs.sync.outputs.version }}.zip` —— 解压后双击 `YunX-Desktop.exe` 即可，无需安装
-            - 若同时构建成功，还会附带 `YunX-Desktop-setup-*.exe` 安装版
+            - 若安装版也构建成功，会额外附带 `YunX-Desktop-setup-*.exe`
 
             ### 注意
             - 程序未做代码签名，首次运行若被 SmartScreen 拦，点「更多信息 → 仍要运行」
