@@ -6,6 +6,12 @@ name: 同步上游并构建 Windows 便携版
 #   3) release: 打成 YunX-Desktop-portable-v<版本>.zip 并挂到本仓库 Releases（tag 沿用上游版本号）
 #
 # 触发方式：每天定时 / 手动 Run workflow（可勾 force 强制重构建同版本）
+#
+# 注意（踩过的坑）：GitHub Actions 的 `shell: powershell` 会把 run 脚本以 **无 BOM 的 UTF-8**
+# 写成临时 .ps1，而 Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读 → 中文变乱码 →
+# 字符串引号错位 → 整个脚本解析失败（Unresolved token / ParserError），一步都不会执行。
+# 所以下面所有 `run:` 脚本一律**只用 ASCII**，中文只出现在 YAML 的 name/注释/body 里。
+# 上游 pr-portable.yml 的 6 次失败就是踩了这一条（throw "7z 打包失败" 里有中文）。
 
 on:
   schedule:
@@ -58,18 +64,18 @@ jobs:
           git fetch --no-tags upstream main
 
           if git merge-base --is-ancestor FETCH_HEAD HEAD; then
-            echo "上游没有新提交，本仓库已是最新。"
+            echo "upstream: no new commits"
             echo "synced=false" >> "$GITHUB_OUTPUT"
           else
-            echo "上游有新提交：$(git log -1 --format='%h %s' FETCH_HEAD)"
-            # 冲突一律保留本仓库版本（README 是本仓库的说明页），其余文件正常合并
+            echo "upstream new commit: $(git log -1 --format='%h %s' FETCH_HEAD)"
+            # conflicts: always keep this repo's version (README is our landing page)
             if ! git merge --no-edit -X ours FETCH_HEAD; then
-              echo "::warning::合并冲突且 -X ours 未能解决，改为对齐上游后重新应用本仓库定制文件"
+              echo "::warning::merge conflict not resolved by -X ours; aligning to upstream then re-applying fork files"
               git merge --abort || true
               git reset --hard FETCH_HEAD
               git checkout "$BEFORE" -- README.md README.upstream.md .github/workflows/sync-upstream-and-build.yml
               git add -A
-              git commit -m "chore: 同步上游并重新应用本仓库定制文件" || true
+              git commit -m "chore: sync upstream and re-apply fork files" || true
             fi
             echo "synced=true" >> "$GITHUB_OUTPUT"
           fi
@@ -78,14 +84,14 @@ jobs:
           git show FETCH_HEAD:README.md > README.upstream.md
           if ! git diff --quiet HEAD -- README.upstream.md; then
             git add README.upstream.md
-            git commit -m "docs: 同步上游 README 原文备份"
+            git commit -m "docs: refresh README.upstream.md from upstream"
           fi
 
           if [ "$(git rev-parse HEAD)" != "$BEFORE" ]; then
             git push origin HEAD:main
-            echo "已推送同步结果到 main"
+            echo "pushed to main"
           else
-            echo "无需推送"
+            echo "nothing to push"
           fi
 
       - name: 判断是否需要构建
@@ -95,20 +101,20 @@ jobs:
           FORCE: ${{ github.event.inputs.force }}
         run: |
           set -eo pipefail
-          # 版本号唯一来源：上游 version.txt 第一行
+          # single source of version: first line of upstream version.txt
           VER="$(head -n1 version.txt | tr -d '[:space:]')"
-          if [ -z "$VER" ]; then echo "::error::version.txt 为空"; exit 1; fi
+          if [ -z "$VER" ]; then echo "::error::version.txt is empty"; exit 1; fi
           TAG="v$VER"
-          echo "上游版本：$VER，目标 tag：$TAG"
+          echo "version=$VER tag=$TAG"
 
           NEED="false"
           if [ "$FORCE" = "true" ]; then
-            echo "手动指定了 force=true，强制构建"
+            echo "force=true -> build anyway"
             NEED="true"
           elif gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "该版本已有 Release，跳过构建（需要重建请手动 Run 并勾 force）"
+            echo "release $TAG already exists, skip build (use force to rebuild)"
           else
-            echo "该版本尚未发布，开始构建"
+            echo "release $TAG not found -> build"
             NEED="true"
           fi
 
@@ -154,13 +160,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\portable-package.ps1
           $exe = '.\release\YunX-Desktop\YunX-Desktop.exe'
-          if (-not (Test-Path $exe)) { throw "构建结束但没有找到 $exe" }
+          if (-not (Test-Path $exe)) { throw "portable exe not found: $exe" }
           $kb = [math]::Round((Get-Item $exe).Length / 1KB, 0)
           $mb = [math]::Round(((Get-ChildItem '.\release\YunX-Desktop' -Recurse -File | Measure-Object Length -Sum).Sum) / 1MB, 1)
-          Write-Host "便携目录就绪：$mb MB，启动器 $kb KB"
+          Write-Host "portable dir ready: $mb MB, launcher $kb KB"
 
-      # 用 Windows 自带的 bsdtar 打 zip（tar.exe 是系统组件，7z 在 runner 上不一定在 PATH，
-      # 上游 pr-portable.yml 的 3 次失败都卡在 7z 这一步）；再兜底 Compress-Archive
+      # 用 Windows 自带的 bsdtar 打 zip（tar.exe 是系统组件；7z 在 runner 上不一定在 PATH）
+      # 再兜底 Compress-Archive，最后自检 zip 结构
       - name: 打包为 zip
         id: zip
         shell: powershell
@@ -169,7 +175,7 @@ jobs:
           $v    = '${{ needs.sync.outputs.version }}'
           $name = "YunX-Desktop-portable-v$v"
           $src  = '.\release\YunX-Desktop'
-          if (-not (Test-Path (Join-Path $src 'YunX-Desktop.exe'))) { throw "没有找到 $src\YunX-Desktop.exe" }
+          if (-not (Test-Path (Join-Path $src 'YunX-Desktop.exe'))) { throw "missing $src\YunX-Desktop.exe" }
           if (Test-Path "$name.zip") { Remove-Item "$name.zip" -Force }
 
           $done = $false
@@ -178,29 +184,29 @@ jobs:
             try {
               & tar.exe -a -c -f "..\$name.zip" 'YunX-Desktop'
               if ($LASTEXITCODE -eq 0 -and (Test-Path "..\$name.zip")) { $done = $true }
-              else { Write-Host "tar 返回 $LASTEXITCODE" }
+              else { Write-Host "tar exit=$LASTEXITCODE" }
             } finally { Pop-Location }
           }
           if (-not $done) {
-            Write-Host '::warning::tar 不可用或失败，回退 Compress-Archive'
+            Write-Host '::warning::tar unavailable or failed, falling back to Compress-Archive'
             Compress-Archive -Path $src -DestinationPath "$name.zip" -CompressionLevel Optimal -Force
             $done = Test-Path "$name.zip"
           }
-          if (-not $done) { throw '打包 zip 失败：tar 与 Compress-Archive 都不可用' }
+          if (-not $done) { throw 'zip failed: neither tar nor Compress-Archive worked' }
 
-          # 产物自检：能打开、有条目、根下有 exe
+          # verify artifact: openable, entry count, exe at zip root
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $z = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path "$name.zip").Path)
           try {
             $entries = $z.Entries.Count
             $hasExe  = @($z.Entries | Where-Object { $_.FullName -eq 'YunX-Desktop/YunX-Desktop.exe' }).Count -gt 0
           } finally { $z.Dispose() }
-          if (-not $hasExe) { throw "zip 内没有 YunX-Desktop/YunX-Desktop.exe（条目数 $entries）" }
+          if (-not $hasExe) { throw "zip has no YunX-Desktop/YunX-Desktop.exe (entries=$entries)" }
 
           $mb = [math]::Round((Get-Item "$name.zip").Length / 1MB, 1)
-          Write-Host "产物：$name.zip（$mb MB，$entries 个条目，已确认含 exe）"
+          Write-Host "artifact: $name.zip ($mb MB, $entries entries, exe present)"
           "name=$name" >> $env:GITHUB_OUTPUT
-          [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, "### 便携包：$name.zip（$mb MB，$entries 个条目）`n")
+          [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, "### Portable: $name.zip ($mb MB, $entries entries)`n")
 
       # 安装版是加分项：需要 Inno Setup（脚本会自动下载安装），失败不影响便携包发布
       - name: 尝试构建安装版（失败不阻塞）
