@@ -838,6 +838,7 @@ class ResolveViewModel(
         SharePlatform.PAN123 -> "0"
         SharePlatform.PAN115 -> Pan115Constants.ROOT_CID
         SharePlatform.GUANGYA -> ""
+        SharePlatform.WEIYUN -> ""
         SharePlatform.ILANZOU -> ""
         SharePlatform.LANZOU -> ""
         SharePlatform.GITHUB -> "github:root"
