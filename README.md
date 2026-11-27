@@ -1,126 +1,112 @@
 <div align="center">
 
-<img src="desktop/src/main/resources/icon.png" width="120" alt="云析 YunX" />
+<img src="desktop/src/main/resources/icon.png" width="110" alt="云析" />
 
-# 云析 YunX · Windows 版（含腾讯微云）
+# 云析 YunX · 微云版
 
-**在 YunX-Desktop 基础上增加「腾讯微云分享解析」的 Windows 构建**
+**在原项目基础上增加「腾讯微云分享解析」的构建**
 
-[⬇ 下载最新版](../../releases/latest) · [原项目（桌面端）](https://github.com/tidain/YunX-Desktop) · [原项目（安卓端）](https://github.com/CYQawa/YunX) · [上游 README 原文](README.upstream.md)
+Windows 与 Android 两端，同一套解析逻辑
+
+[⬇ Windows 版](https://github.com/leluo123/YunX-Desktop/releases/latest) ｜
+[⬇ Android 版](https://github.com/leluo123/YunX/releases) ｜
+[上游桌面端](https://github.com/tidain/YunX-Desktop) ｜
+[上游安卓端](https://github.com/CYQawa/YunX)
 
 </div>
 
 ---
 
-## 致谢与立场
+## 关于这个项目
 
-这个项目的**代码、设计和绝大部分功能都不是我做的**。
+[云析 YunX](https://github.com/CYQawa/YunX) 是一个开源的网盘分享链接解析下载工具，支持夸克 / UC / 迅雷 / 百度 / 139 / 123 / 115 / 光鸭 / 蓝奏云等网盘，以及抖音 / B站 / 小红书等平台的视频解析。
 
-- 感谢 **[tidain](https://github.com/tidain)** 写出 YunX 桌面版（Kotlin + Compose Multiplatform）
-- 感谢 **[CYQawa](https://github.com/CYQawa)** 写出安卓端与整套网盘 / 视频解析能力
+本项目是它的**下游构建**：在原作者代码的基础上，增加了**腾讯微云**这一家网盘的支持，并把两端分别打包成可直接运行的 Windows 程序和 Android 安装包。
 
-两者均以 **AGPL-3.0** 开源。本仓库是它们的下游：**只新增了「腾讯微云」这一家网盘的支持**，其余功能、代码、UI 全部来自原作者。描述若有不准确，请原作者直接指出。
+代码版权归原作者所有，本项目遵循上游的 **AGPL-3.0** 协议开放。
 
-> **云析永远免费开源。** 如果你是在任何地方「花钱买到」的，说明你被骗了，请退款。
+---
+
+## 两个产物
+
+| 平台 | 从这里下载 | 说明 |
+|---|---|---|
+| **Windows** | [Releases](https://github.com/leluo123/YunX-Desktop/releases/latest) | `YunX-Desktop-portable-v<版本>-wx.zip`，解压即用，无需安装 |
+| **Android** | [Releases](https://github.com/leluo123/YunX/releases) | `YunX-<版本>-wx.apk`，7 MB 左右 |
+
+- 源码：[Windows 端](https://github.com/leluo123/YunX-Desktop) ｜ [Android 端](https://github.com/leluo123/YunX)
+- 两个仓库都会跟随上游更新，并自动构建新版本。
 
 ---
 
 ## 本版新增：腾讯微云
 
-上次问「云析能不能解析微云」的答案是**不能**（上游 10 家网盘里没有微云）。本版把它补上了，而且是**免登录**的。
-
 | 能力 | 说明 |
 |---|---|
-| 分享链接解析 | `https://share.weiyun.com/{id}`，几百 KB 到大文件都支持 |
-| 目录浏览 | 分享的是文件夹时，可以一层层点进去 |
-| 直链下载 | 走 Range 分片并发 + 断点续传（微云 CDN 支持 `Accept-Ranges`） |
-| 提取码 | 链接带 `?pwd=` 自动识别；需要码的分享会提示填写 |
-| 登录 | **不需要**。微云分享本身是匿名链路 |
+| 分享链接解析 | `https://share.weiyun.com/{id}` |
+| 目录浏览 | 分享的是文件夹时可以一层层点进去 |
+| 下载 | Range 分片并发 + 断点续传（微云 CDN 支持 `Accept-Ranges`） |
+| 提取码 | 链接带 `?pwd=` 时自动识别 |
+| 登录 | **不需要**，微云分享本身是匿名链路 |
 
 ### 怎么用
 
-1. 打开「解析」页，粘贴微云分享链接
-2. 点「开始解析」→ 列出文件
-3. 点文件 → 弹出「下载直链」→ 选目录 → 开始下载
+粘贴分享链接 → 解析 → 列出文件 → 点文件取直链下载。和用其它网盘没有区别。
 
-### 顺手做了个浏览器脚本
+### 两个轻量工具
 
-不想装客户端？仓库里 [`tools/weiyun-via.user.js`](tools/weiyun-via.user.js) 是一个油猴 / Via 浏览器脚本：打开微云分享页时右下角自动出现面板，列出文件、给「直链」和「下载」两个按钮。装法见 [`tools/README.md`](tools/README.md)。
+除了主程序，`tools/` 里还有两个小工具，适合临时用：
 
-命令行也能用：[`tools/weiyun_share.py`](tools/weiyun_share.py)（纯标准库）
+- **[`weiyun-via.user.js`](tools/weiyun-via.user.js)** —— 浏览器脚本。打开微云分享页时右下角自动出现面板，列出文件并给「直链」「下载」两个按钮。支持 Via 浏览器和各类油猴管理器。
+- **[`weiyun_share.py`](tools/weiyun_share.py)** —— 命令行工具，纯标准库。
 
 ```bash
-python weiyun_share.py list   https://share.weiyun.com/xxxxxxxx
-python weiyun_share.py url    https://share.weiyun.com/xxxxxxxx
-python weiyun_share.py get    https://share.weiyun.com/xxxxxxxx ./out
+python weiyun_share.py list https://share.weiyun.com/xxxxxxxx
+python weiyun_share.py get  https://share.weiyun.com/xxxxxxxx ./out
 ```
 
----
-
-## 本仓库相对上游改了什么
-
-**源码**（只碰与「加一家网盘」相关的地方）：
-
-| 文件 | 改动 |
-|---|---|
-| `data/network/WeiyunConstants.kt` | 新增：域名 / UA / `appid=30113` / cmd 常量 |
-| `data/network/WeiyunApi.kt` | 新增：分享页解析 → 列目录 → 取直链 |
-| `data/repository/WeiyunResolveRepository.kt` | 新增：实现 `ShareResolveRepository` |
-| `data/network/ShareLinkParser.kt` | `SharePlatform` 加 `WEIYUN` + 链接正则 + parse 分支 |
-| `data/download/DownloadPlatform.kt` | 加 `WEIYUN` 常量 |
-| `ui/viewmodel/ResolveViewModel.kt` | 注入、凭证、`currentRepo()` 分发、平台名、免登录白名单、默认目录 |
-| `ui/MainScreen.kt` | 装配 `WeiyunApi` / `WeiyunResolveRepository` |
-| `ui/screens/ResolveScreen.kt` · `ui/clipboard/ClipboardLinkPopup.kt` | 两处穷尽 `when` 补分支 |
-
-**不碰**：账号、数据库、备份 —— 微云免登录，`AccountDirectory` / `AppDatabase` / `SecureAccountDaos` / `AuthBackupManager` 全部无需改动。
-
-**CI / 构建**：
-
-| 改动 | 原因 |
-|---|---|
-| 上游同步的「补丁回放名单」纳入上面的文件 | 原 workflow 冲突兜底是 `git reset --hard` + 只回放 README，会把源码补丁整体丢掉 |
-| 新增「校验微云补丁仍在」步骤 | 上游重构可能让补丁「merge 成功但注册行消失」，构建前 grep 断言 |
-| tag 改成 `v<版本>-wx` | 与上游 `v<版本>` 区分命名空间，补丁迭代也能再发版 |
-| `YUNX_USE_MIRROR` 开关 + CI 设 `false` | 阿里云 Maven 镜像对 `org.jetbrains.compose.desktop:*-windows-x64` 返回 **502**，Runner 上直接编译失败 |
+安装与原理见 [`tools/README.md`](tools/README.md)。
 
 ---
 
-## 下载与使用
+## 相对上游做了哪些改动
 
-去 [**Releases**](../../releases/latest) 下载 `YunX-Desktop-portable-v<版本>-wx.zip`：
+改动集中在「接入一家新网盘」需要碰的地方，其余功能、界面、代码均保持上游原样。
 
-1. 解压到任意目录（**别放 `C:\Program Files`，别在压缩包里直接双击**）
-2. 双击 `YunX-Desktop.exe`
-3. 首次若弹「Windows 已保护你的电脑」→ **更多信息 → 仍要运行**（未做代码签名，开源项目普遍如此）
+**新增**：`WeiyunConstants.kt`、`WeiyunApi.kt`、`WeiyunResolveRepository.kt`
 
-视频预览 / 磁力下载所需的 FFmpeg、Gopeed 不随包发布，首次使用时在「设置 → 引擎管理」里下。
+**修改**：`ShareLinkParser`（链接识别）、`DownloadPlatform`（平台标识）、`ResolveViewModel`（分发与凭证）、`MainScreen`（装配）、`ResolveScreen` / `ClipboardLinkPopup`（平台名）
 
-其余功能（账号登录、视频解析、磁力、浏览器插件等）**请看原项目文档**：
-[功能清单](https://github.com/tidain/YunX-Desktop/blob/main/docs/FEATURES.md) ｜ [使用说明](https://github.com/tidain/YunX-Desktop/blob/main/docs/USAGE.md) ｜ [与安卓版的差异](https://github.com/tidain/YunX-Desktop/blob/main/docs/UPSTREAM-DIFF.md)
+**未改动**：账号体系、数据库、备份 —— 微云免登录，这些都用不到。
 
----
-
-## 微云支持的边界（丑话说前面）
-
-1. **不支持转存到微云个人盘** —— 那需要登录账号，本版只做分享直链下载。UI 上「保存到网盘」对微云会提示暂不支持。
-2. **空壳分享**：分享方删了文件但分享链接还在时，会显示空列表（服务端如此）。
-3. **需要提取码的分享**：链接不带 `?pwd=` 时要手动填。
-4. **上游同步**：本仓库每天跟随上游。若上游大改 `ShareLinkParser.kt`，当前策略是保留我方版本（不会丢微云），但上游那次改动需要人工合并。
+构建方面做了几处维护性调整：上游同步时保留本地补丁、构建前校验补丁存在、发版 tag 加 `-wx` 后缀与上游区分、CI 使用官方 Maven 源。
 
 ---
 
-## 自动构建
+## 使用提示
 
-```
-每天 05:00（北京时间）/ 手动 Run workflow / 推送到 main
-        │
-        ├─ 同步上游 main（冲突保留我方补丁文件）
-        ├─ 校验微云补丁仍在（少了就直接失败，不产出残缺包）
-        ├─ 读 version.txt，判断 v<版本>-wx 是否已发布
-        ├─ Windows runner 跑上游 portable-package.ps1 → 编译 + jlink + jpackage
-        └─ 打包 zip → 发布 Release
-```
+- **Windows**：解压到任意目录后双击 `YunX-Desktop.exe`。首次运行若被 SmartScreen 拦截，选「更多信息 → 仍要运行」即可（程序没有代码签名）。
+- **Android**：本版使用临时自签名证书，因此**每次构建的签名不同**，覆盖安装失败时先卸载旧版。如需稳定升级，可在仓库 Secrets 里配置自己的签名证书。
+- 视频预览与磁力下载所需的 FFmpeg / Gopeed 不随包发布，首次使用时在「设置 → 引擎管理」里下载。
 
-## 授权
+---
 
-[AGPL-3.0](./LICENSE)。代码版权归 tidain / CYQawa；本仓库的改动同样以 AGPL-3.0 开放。
+## 已知限制
+
+1. 微云**不支持转存到个人盘**（转存需要登录账号），本版只做分享直链下载。
+2. 分享方删除文件但分享链接仍在时，会显示空列表。
+3. 需要提取码的分享需手动填写。
+4. 桌面端每天跟随上游同步；若上游大幅改动解析入口文件，本地补丁会保留，但上游那次改动需要人工合并。
+
+---
+
+## 致谢与协议
+
+本项目的代码主要来自：
+
+- **[CYQawa/YunX](https://github.com/CYQawa/YunX)** —— 安卓端与全部网盘 / 视频解析能力
+- **[tidain/YunX-Desktop](https://github.com/tidain/YunX-Desktop)** —— 桌面端（Kotlin + Compose Multiplatform）
+
+感谢两位原作者把项目以 AGPL-3.0 开源出来。本项目对其代码的再分发与修改同样遵循 **AGPL-3.0**，相关源码在上述链接中完整公开。
+
+如果本项目的描述有误，或你对改动有异议，欢迎直接提出，会尽快调整。
