@@ -180,6 +180,9 @@ jobs:
       # + JCEF 语言包裁剪 + jlink 运行时 + jpackage + 自研启动器
       - name: 构建便携包
         shell: powershell
+        env:
+          # Runner 在海外，阿里云镜像对部分 Compose 构件返回 502 ⇒ 走官方源
+          YUNX_USE_MIRROR: 'false'
         run: |
           $ErrorActionPreference = 'Stop'
           .\portable-package.ps1
