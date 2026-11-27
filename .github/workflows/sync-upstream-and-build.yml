@@ -1,9 +1,10 @@
-name: 同步上游并构建 Windows 便携版
+name: 同步上游并构建 Windows 便携版（含微云补丁）
 
-# 这个仓库只做「跟随上游 + 编译打包」，不改任何功能代码。
-#   1) sync   : 拉上游 tidain/YunX-Desktop 的 main，合并进本仓库 main 并 push
-#   2) build  : 在 windows-2022 上跑上游自带的 portable-package.ps1，产出 YunX-Desktop.exe
-#   3) release: 打成 YunX-Desktop-portable-v<版本>.zip 并挂到本仓库 Releases（tag 沿用上游版本号）
+# 本仓库 = 上游 tidain/YunX-Desktop + 腾讯微云补丁（9 个源码文件 + tools/）。
+#   1) sync   : 拉上游 main 正常合并进 main；真冲突时以上游为基线、回放我方补丁文件后 push
+#   2) guard  : 构建前断言微云补丁仍在（补丁被吃掉就失败，不出残缺包）
+#   3) build  : 在 windows-2022 上跑上游自带的 portable-package.ps1
+#   4) release: 打成 YunX-Desktop-portable-v<版本>-wx.zip 挂到本仓库 Releases
 #
 # 触发方式：每天定时 / 手动 Run workflow（可勾 force 强制重构建同版本）
 #
@@ -68,13 +69,15 @@ jobs:
             echo "synced=false" >> "$GITHUB_OUTPUT"
           else
             echo "upstream new commit: $(git log -1 --format='%h %s' FETCH_HEAD)"
-            # conflicts: always keep this repo's version (README is our landing page)
-            if ! git merge --no-edit -X ours FETCH_HEAD; then
-              echo "::warning::merge conflict not resolved by -X ours; aligning to upstream then re-applying fork files"
+            # 普通 merge：上游改到别处的改动照常合进来。
+            # 只有真的文本冲突时才回退到「以上游为基线 + 回放我方补丁」，
+            # 这样上游的安全修复/新功能不会因为我们改了同目录而被整体压掉。
+            if ! git merge --no-edit FETCH_HEAD; then
+              echo "::warning::merge conflict with upstream; rebasing onto upstream then re-applying our patch files"
               git merge --abort || true
               git reset --hard FETCH_HEAD
-              # 我方补丁文件必须一起回放，否则 reset --hard 会把微云支持整体丢掉
-              git checkout "$BEFORE" -- README.md README.upstream.md .github/workflows/sync-upstream-and-build.yml \
+              # reset --hard 会删掉上游没有的文件（Weiyun*.kt / tools/），所以补丁清单必须完整回放
+              git checkout "$BEFORE" -- README.md README.upstream.md .github/workflows/sync-upstream-and-build.yml tools \
                 desktop/src/main/kotlin/com/yunx/app/data/network/WeiyunApi.kt \
                 desktop/src/main/kotlin/com/yunx/app/data/network/WeiyunConstants.kt \
                 desktop/src/main/kotlin/com/yunx/app/data/repository/WeiyunResolveRepository.kt \
@@ -85,7 +88,7 @@ jobs:
                 desktop/src/main/kotlin/com/yunx/app/ui/clipboard/ClipboardLinkPopup.kt \
                 desktop/src/main/kotlin/com/yunx/app/ui/screens/ResolveScreen.kt
               git add -A
-              git commit -m "chore: sync upstream and re-apply fork files" || true
+              git commit -m "chore: sync upstream and re-apply our patch files" || true
             fi
             echo "synced=true" >> "$GITHUB_OUTPUT"
           fi
