@@ -1,7 +1,7 @@
 package com.yunx.app.data.network
 
 /** 网盘平台 */
-enum class SharePlatform { QUARK, UC, XUNLEI, BAIDU, C139, PAN123, PAN115, GUANGYA, ILANZOU, LANZOU, GITHUB }
+enum class SharePlatform { QUARK, UC, XUNLEI, BAIDU, C139, PAN123, PAN115, GUANGYA, WEIYUN, ILANZOU, LANZOU, GITHUB }
 
 /**
  * 解析结果：share_id + 提取码 + 平台。
@@ -39,6 +39,10 @@ object ShareLinkParser {
     private val pan115ShareIdRegex = Regex("""115(?:cdn|rc)?\.com/s/(sw[A-Za-z0-9]+)""", RegexOption.IGNORE_CASE)
     private val pan115CommandRegex = Regex("""115(?:cdn|rc)?\.com/(sw[A-Za-z0-9]{8,})-([A-Za-z0-9]{4,8})""", RegexOption.IGNORE_CASE)
     private val pwdIn115UrlRegex = Regex("""[?&]password=([A-Za-z0-9]+)""")
+    // 腾讯微云分享链接：https://share.weiyun.com/{shareId}；shareId 为 [A-Za-z0-9_-]{4,40}
+    // 前置边界 (?:^|[/.])：避免把 www.weiyun.com 之类的站内链接误判为分享
+    private val weiyunShareIdRegex =
+        Regex("""(?:^|[/.])share\.weiyun\.com/([A-Za-z0-9_-]{4,40})""", RegexOption.IGNORE_CASE)
     // 光鸭云盘分享链接：https://www.guangyapan.com/s/{shareId}；shareId 字符集 [A-Za-z0-9_-]+
     private val guangyaShareIdRegex = Regex("""guangyapan\.com/s/([A-Za-z0-9_-]+)""", RegexOption.IGNORE_CASE)
     // 蓝奏云优享版分享链接：{ilanzou host}/s/{id}。先于蓝奏云判断，避免与蓝奏云混淆
@@ -119,6 +123,12 @@ object ShareLinkParser {
                 pwd = match.groupValues[2],
                 platform = SharePlatform.PAN115
             )
+        }
+        // 腾讯微云分享链接：https://share.weiyun.com/{shareId}（提取码在 ?pwd= 或文案里）
+        weiyunShareIdRegex.find(url)?.groupValues?.getOrNull(1)?.let { sid ->
+            val pwd = pwdInUrlRegex.find(url)?.groupValues?.getOrNull(1)
+                ?: pwdInTextRegex.find(text)?.groupValues?.getOrNull(1)
+            return ParsedShare(shareId = sid, pwd = pwd, platform = SharePlatform.WEIYUN)
         }
         // 光鸭云盘链接：https://www.guangyapan.com/s/{shareId}（提取码可由 ?pwd= 或文案指定）
         guangyaShareIdRegex.find(url)?.groupValues?.getOrNull(1)?.let { sid ->

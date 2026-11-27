@@ -73,7 +73,17 @@ jobs:
               echo "::warning::merge conflict not resolved by -X ours; aligning to upstream then re-applying fork files"
               git merge --abort || true
               git reset --hard FETCH_HEAD
-              git checkout "$BEFORE" -- README.md README.upstream.md .github/workflows/sync-upstream-and-build.yml
+              # 我方补丁文件必须一起回放，否则 reset --hard 会把微云支持整体丢掉
+              git checkout "$BEFORE" -- README.md README.upstream.md .github/workflows/sync-upstream-and-build.yml \
+                desktop/src/main/kotlin/com/yunx/app/data/network/WeiyunApi.kt \
+                desktop/src/main/kotlin/com/yunx/app/data/network/WeiyunConstants.kt \
+                desktop/src/main/kotlin/com/yunx/app/data/repository/WeiyunResolveRepository.kt \
+                desktop/src/main/kotlin/com/yunx/app/data/network/ShareLinkParser.kt \
+                desktop/src/main/kotlin/com/yunx/app/data/download/DownloadPlatform.kt \
+                desktop/src/main/kotlin/com/yunx/app/ui/viewmodel/ResolveViewModel.kt \
+                desktop/src/main/kotlin/com/yunx/app/ui/MainScreen.kt \
+                desktop/src/main/kotlin/com/yunx/app/ui/clipboard/ClipboardLinkPopup.kt \
+                desktop/src/main/kotlin/com/yunx/app/ui/screens/ResolveScreen.kt
               git add -A
               git commit -m "chore: sync upstream and re-apply fork files" || true
             fi
@@ -104,7 +114,8 @@ jobs:
           # single source of version: first line of upstream version.txt
           VER="$(head -n1 version.txt | tr -d '[:space:]')"
           if [ -z "$VER" ]; then echo "::error::version.txt is empty"; exit 1; fi
-          TAG="v$VER"
+          # 我方补丁版用独立命名空间，避免与上游 v<版本> 抢 tag、也便于补丁迭代再发版
+          TAG="v$VER-wx"
           echo "version=$VER tag=$TAG"
 
           NEED="false"
@@ -133,6 +144,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+
+      # 上游同步可能把补丁"合并成功但内容消失"（重构挪走注册行），构建前先断言一遍
+      - name: 校验微云补丁仍在
+        shell: bash
+        run: |
+          set -e
+          fail() { echo "::error::$1"; exit 1; }
+          test -f desktop/src/main/kotlin/com/yunx/app/data/repository/WeiyunResolveRepository.kt || fail "缺少 WeiyunResolveRepository.kt"
+          test -f desktop/src/main/kotlin/com/yunx/app/data/network/WeiyunApi.kt || fail "缺少 WeiyunApi.kt"
+          grep -q "WEIYUN" desktop/src/main/kotlin/com/yunx/app/data/network/ShareLinkParser.kt || fail "ShareLinkParser 未注册 WEIYUN"
+          grep -q "SharePlatform.WEIYUN -> weiyunResolveRepository" desktop/src/main/kotlin/com/yunx/app/ui/viewmodel/ResolveViewModel.kt || fail "ResolveViewModel 未分发 WEIYUN"
+          grep -q "WeiyunResolveRepository(weiyunApi)" desktop/src/main/kotlin/com/yunx/app/ui/MainScreen.kt || fail "MainScreen 未注入微云仓库"
+          echo "微云补丁校验通过"
 
       # Temurin 17 自带 jpackage；portable-package.ps1 的 Ensure-Jdk 通过 JAVA_HOME 找到它
       - name: 安装 JDK 17
@@ -173,7 +197,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $v    = '${{ needs.sync.outputs.version }}'
-          $name = "YunX-Desktop-portable-v$v"
+          $name = "YunX-Desktop-portable-v$v-wx"
           $src  = '.\release\YunX-Desktop'
           if (-not (Test-Path (Join-Path $src 'YunX-Desktop.exe'))) { throw "missing $src\YunX-Desktop.exe" }
           if (Test-Path "$name.zip") { Remove-Item "$name.zip" -Force }
@@ -235,14 +259,17 @@ jobs:
             YunX-Desktop-portable-*.zip
             release/*.exe
           body: |
-            ## 云析 YunX ${{ needs.sync.outputs.version }} · Windows 便携版
+            ## 云析 YunX ${{ needs.sync.outputs.version }}-wx · Windows 便携版（含腾讯微云支持）
 
             本产物由 **本仓库自动构建**：同步上游代码 → 跑上游自带的 `portable-package.ps1` → 打包 zip。
             代码版权归原作者所有，详见 [README](https://github.com/${{ github.repository }}/blob/main/README.md)。
 
             ### 下载
-            - `YunX-Desktop-portable-v${{ needs.sync.outputs.version }}.zip` —— 解压后双击 `YunX-Desktop.exe` 即可，无需安装
+            - `YunX-Desktop-portable-v${{ needs.sync.outputs.version }}-wx.zip` —— 解压后双击 `YunX-Desktop.exe` 即可，无需安装
             - 若安装版也构建成功，会额外附带 `YunX-Desktop-setup-*.exe`
+
+            ### 本版新增（相对上游）
+            - **腾讯微云（share.weiyun.com）分享解析**：粘贴微云分享链接即可浏览文件、取直链下载；免登录，支持目录与 Range 分片
 
             ### 注意
             - 程序未做代码签名，首次运行若被 SmartScreen 拦，点「更多信息 → 仍要运行」

@@ -51,6 +51,7 @@ import com.yunx.app.data.repository.C139AccountRepository
 import com.yunx.app.data.repository.C139ResolveRepository
 import com.yunx.app.data.repository.GuangYaAccountRepository
 import com.yunx.app.data.repository.GuangYaResolveRepository
+import com.yunx.app.data.repository.WeiyunResolveRepository
 import com.yunx.app.data.repository.ILanzouAccountRepository
 import com.yunx.app.data.repository.ILanzouResolveRepository
 import com.yunx.app.data.repository.LanzouAccountRepository
@@ -102,6 +103,7 @@ class ResolveViewModel(
     private val pan115ResolveRepository: Pan115ResolveRepository,
     private val guangyaAccountRepository: GuangYaAccountRepository,
     private val guangyaResolveRepository: GuangYaResolveRepository,
+    private val weiyunResolveRepository: WeiyunResolveRepository,
     private val ilanzouAccountRepository: ILanzouAccountRepository,
     private val ilanzouResolveRepository: ILanzouResolveRepository,
     private val lanzouAccountRepository: LanzouAccountRepository,
@@ -752,6 +754,7 @@ class ResolveViewModel(
         SharePlatform.PAN123 -> pan123AccountRepository.getAccount()?.accessToken
         SharePlatform.PAN115 -> pan115AccountRepository.getAccount()?.cookie
         SharePlatform.GUANGYA -> guangyaAccountRepository.ensureAccessToken()
+        SharePlatform.WEIYUN -> null
         SharePlatform.ILANZOU -> ilanzouAccountRepository.getAccount()?.appToken
         SharePlatform.LANZOU -> lanzouAccountRepository.getAccount()?.cookie
         SharePlatform.GITHUB -> null
@@ -766,6 +769,7 @@ class ResolveViewModel(
         SharePlatform.PAN123 -> pan123ResolveRepository
         SharePlatform.PAN115 -> pan115ResolveRepository
         SharePlatform.GUANGYA -> guangyaResolveRepository
+        SharePlatform.WEIYUN -> weiyunResolveRepository
         SharePlatform.ILANZOU -> ilanzouResolveRepository
         SharePlatform.LANZOU -> lanzouResolveRepository
         else -> resolveRepository
@@ -848,6 +852,7 @@ class ResolveViewModel(
         SharePlatform.PAN123 -> "123云盘"
         SharePlatform.PAN115 -> "115网盘"
         SharePlatform.GUANGYA -> "光鸭云盘"
+        SharePlatform.WEIYUN -> "腾讯微云"
         SharePlatform.ILANZOU -> "蓝奏云优享版"
         SharePlatform.LANZOU -> "蓝奏云"
         SharePlatform.GITHUB -> "GitHub"
@@ -865,6 +870,7 @@ class ResolveViewModel(
         currentPlatform == SharePlatform.QUARK ||
             currentPlatform == SharePlatform.UC ||
             currentPlatform == SharePlatform.GUANGYA ||
+            currentPlatform == SharePlatform.WEIYUN ||
             currentPlatform == SharePlatform.ILANZOU ||
             currentPlatform == SharePlatform.LANZOU
 
@@ -2101,6 +2107,7 @@ class ResolveViewModel(
         private val pan115ResolveRepository: Pan115ResolveRepository,
         private val guangyaAccountRepository: GuangYaAccountRepository,
         private val guangyaResolveRepository: GuangYaResolveRepository,
+        private val weiyunResolveRepository: WeiyunResolveRepository,
         private val ilanzouAccountRepository: ILanzouAccountRepository,
         private val ilanzouResolveRepository: ILanzouResolveRepository,
         private val lanzouAccountRepository: LanzouAccountRepository,
@@ -2128,6 +2135,7 @@ class ResolveViewModel(
                 pan123AccountRepository, pan123ResolveRepository,
                 pan115AccountRepository, pan115ResolveRepository,
                 guangyaAccountRepository, guangyaResolveRepository,
+                weiyunResolveRepository,
                 ilanzouAccountRepository, ilanzouResolveRepository,
                 lanzouAccountRepository, lanzouResolveRepository,
                 downloadManager,

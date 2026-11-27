@@ -16,6 +16,8 @@ object DownloadPlatform {
     const val PAN115 = "pan115"
     /** 光鸭云盘 */
     const val GUANGYA = "guangya"
+    /** 腾讯微云 */
+    const val WEIYUN = "weiyun"
     /** 蓝奏云优享版 */
     const val ILANZOU = "ilanzou"
     /** 蓝奏云 */

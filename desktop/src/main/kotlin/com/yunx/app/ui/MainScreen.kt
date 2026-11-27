@@ -79,6 +79,7 @@ import com.yunx.app.data.network.GitHubApi
 import com.yunx.app.data.network.GitHubMirror
 import com.yunx.app.data.network.GitHubTokenStore
 import com.yunx.app.data.network.GuangYaApi
+import com.yunx.app.data.network.WeiyunApi
 import com.yunx.app.data.network.HttpClients
 import com.yunx.app.data.network.ILanzouApi
 import com.yunx.app.data.network.LanzouApi
@@ -108,6 +109,7 @@ import com.yunx.app.data.repository.C139AccountRepository
 import com.yunx.app.data.repository.C139ResolveRepository
 import com.yunx.app.data.repository.GuangYaAccountRepository
 import com.yunx.app.data.repository.GuangYaResolveRepository
+import com.yunx.app.data.repository.WeiyunResolveRepository
 import com.yunx.app.data.repository.ILanzouAccountRepository
 import com.yunx.app.data.repository.ILanzouResolveRepository
 import com.yunx.app.data.repository.LanzouAccountRepository
@@ -264,6 +266,7 @@ fun MainScreen(
     val pan123Api = remember { Pan123Api() }
     val pan115Api = remember { Pan115Api() }
     val guangyaApi = remember { GuangYaApi() }
+    val weiyunApi = remember { WeiyunApi() }
     val ilanzouApi = remember { ILanzouApi() }
     val lanzouApi = remember { LanzouApi() }
     val db = remember { AppDatabase.get() }
@@ -611,6 +614,9 @@ fun MainScreen(
             tokenProvider = { guangyaRepository.ensureAccessToken() }
         )
     }
+    val weiyunResolveRepository = remember {
+        WeiyunResolveRepository(weiyunApi)
+    }
     val ilanzouResolveRepository = remember {
         ILanzouResolveRepository(ilanzouApi, ilanzouRepository)
     }
@@ -635,6 +641,7 @@ fun MainScreen(
             pan115ResolveRepository,
             guangyaRepository,
             guangyaResolveRepository,
+            weiyunResolveRepository,
             ilanzouRepository,
             ilanzouResolveRepository,
             lanzouRepository,
