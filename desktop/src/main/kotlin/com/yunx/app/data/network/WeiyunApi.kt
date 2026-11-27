@@ -247,6 +247,8 @@ class WeiyunApi(
             .header("Referer", "${WeiyunConstants.BASE_URL}/${shareId}")
             .header("Origin", WeiyunConstants.BASE_URL)
             .header("Content-Type", "application/json")
+            // 分享页下发的 wyctoken 既做 g_tk 又必须作为 Cookie 回传，缺它服务端直接 403
+            .apply { if (gtk.isNotBlank()) header("Cookie", "wyctoken=$gtk") }
             .post(envelope.toString().toRequestBody(jsonMediaType))
             .build()
         client.newCall(req).execute().use { resp ->
