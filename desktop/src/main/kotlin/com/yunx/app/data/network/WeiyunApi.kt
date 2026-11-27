@@ -123,7 +123,7 @@ class WeiyunApi(
                     dirs.optJSONObject(i)?.let { out.add(parseDir(it, dirKey)) }
                 }
                 for (i in 0 until files.length()) {
-                    files.optJSONObject(i)?.let { out.add(parseFile(it)) }
+                    files.optJSONObject(i)?.let { out.add(parseFile(it, dirKey)) }
                 }
                 offset += files.length() + dirs.length()
                 pages++
@@ -323,12 +323,19 @@ class WeiyunApi(
         )
     }
 
-    private fun parseFile(obj: JSONObject): WeiyunEntry = WeiyunEntry(
+    /**
+     * 解析文件条目。
+     *
+     * 注意两个坑（实测）：
+     * 1. 分享页 `shareInfo.file_list` 用 `file_name`，而 `WeiyunShareDirList` 返回的是 `filename`（无下划线）；
+     * 2. `WeiyunShareDirList` 返回的 `pdir_key` 为 null，取直链必须用「所在目录的 dir_key」兜底。
+     */
+    private fun parseFile(obj: JSONObject, fallbackPdirKey: String = ""): WeiyunEntry = WeiyunEntry(
         id = obj.optString("file_id"),
-        name = obj.optString("file_name"),
+        name = obj.optString("file_name").ifBlank { obj.optString("filename") },
         size = obj.optLong("file_size", 0L),
         isDir = false,
-        pdirKey = obj.optString("pdir_key"),
+        pdirKey = obj.optString("pdir_key").ifBlank { fallbackPdirKey },
         libId = obj.optInt("lib_id", 0),
         modifyTime = obj.optLong("file_mtime", 0L)
     )
