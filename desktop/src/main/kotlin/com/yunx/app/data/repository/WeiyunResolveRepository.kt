@@ -44,7 +44,11 @@ class WeiyunResolveRepository(
     override suspend fun listFiles(session: ShareSession, dirFid: String, cookie: String): Result<List<ShareFile>> =
         runCatching {
             val share = cache[session.shareId] ?: reload(session)
-            val entries: List<WeiyunEntry> = if (dirFid.isBlank() || dirFid == share.pdirKey) {
+            // 根目录内容分享页已经直出；微云对根目录（pdir_key）调 DirList 会返回
+            // 114516 dir key is forbidden，所以只有「确实是已知子目录」才走接口，
+            // 其余（空串 / pdir_key / 调用方按平台兜底的 "0" 之类）一律回根列表。
+            val knownDirs = share.entries.asSequence().filter { it.isDir }.map { it.id }.toHashSet()
+            val entries: List<WeiyunEntry> = if (dirFid.isBlank() || dirFid == share.pdirKey || dirFid !in knownDirs) {
                 share.entries
             } else {
                 api.listDir(
